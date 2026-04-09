@@ -1,1 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>URL 定时访问管理面板</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="login-panel" class="card">
+      <h2>登录</h2>
+      <div class="form-group">
+        <label>登录密码：</label>
+        <input type="password" id="password-input" />
+      </div>
+      <div class="form-group">
+        <label>GitHub Token（仅本地使用，不会保存）：</label>
+        <input type="password" id="token-input" />
+        <small>需要具有对当前仓库的 <code>repo</code> 写权限。</small>
+      </div>
+      <button id="login-button">登录</button>
+      <p id="login-error" class="error"></p>
+    </div>
 
+    <div id="main-panel" class="hidden">
+      <div class="card">
+        <h2>任务列表</h2>
+        <button id="reload-button">重新加载任务</button>
+        <table id="tasks-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>URL</th>
+              <th>时间</th>
+              <th>星期</th>
+              <th>备注</th>
+              <th>启用</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="tasks-tbody">
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2 id="form-title">新增任务</h2>
+        <div class="form-group">
+          <label>URL：</label>
+          <input type="text" id="task-url" placeholder="https://..." />
+        </div>
+        <div class="form-group">
+          <label>时间（24 小时制）：</label>
+          <input type="number" id="task-hour" min="0" max="23" /> 点
+          <input type="number" id="task-minute" min="0" max="59" /> 分
+        </div>
+        <div class="form-group">
+          <label>星期：</label>
+          <select id="task-weekday">
+            <option value="">每天</option>
+            <option value="1">周一</option>
+            <option value="2">周二</option>
+            <option value="3">周三</option>
+            <option value="4">周四</option>
+            <option value="5">周五</option>
+            <option value="6">周六</option>
+            <option value="7">周日</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>备注：</label>
+          <input type="text" id="task-remark" />
+        </div>
+        <div class="form-group">
+          <label>启用：</label>
+          <input type="checkbox" id="task-enabled" checked />
+        </div>
+        <input type="hidden" id="task-id" />
+        <button id="save-task-button">保存任务</button>
+        <button id="cancel-edit-button" class="secondary hidden">取消编辑</button>
+        <p id="save-status"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
