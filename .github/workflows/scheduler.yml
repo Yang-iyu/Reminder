@@ -1,8 +1,8 @@
-name: URL Scheduler
+name: URL Scheduler (cron + logs)
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # 每分钟检查一次
+    - cron: "*/1 * * * *"   # 每分钟检查一次
   workflow_dispatch:
 
 jobs:
@@ -13,39 +13,83 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
 
-      - name: Execute due tasks
+      - name: Install cron-parser
+        run: npm install cron-parser
+
+      - name: Run scheduler
         run: |
-          if [ ! -f tasks.json ]; then
-            echo "tasks.json not found, skip."
-            exit 0
-          fi
+          node << 'EOF'
+          const fs = require('fs');
+          const parser = require('cron-parser');
 
-          now_minute=$(date +%M)
-          now_hour=$(date +%H)
-          now_weekday=$(date +%u)  # 1=Monday ... 7=Sunday
+          const tasks = JSON.parse(fs.readFileSync('tasks.json', 'utf8'));
+          const now = new Date();
 
-          echo "Current time: $now_hour:$now_minute, weekday: $now_weekday"
+          function shouldRun(cronExpr) {
+            try {
+              const interval = parser.parseExpression(cronExpr, { currentDate: now });
+              const prev = interval.prev();
+              const diff = now - prev;
+              return diff >= 0 && diff < 60000; // 1 分钟内
+            } catch (e) {
+              console.log("Cron 解析失败:", cronExpr, e.message);
+              return false;
+            }
+          }
 
-          jq -c '.[] | select(.enabled == true)' tasks.json | while read task; do
-            id=$(echo "$task" | jq -r '.id')
-            url=$(echo "$task" | jq -r '.url')
-            remark=$(echo "$task" | jq -r '.remark')
-            minute=$(echo "$task" | jq -r '.minute')
-            hour=$(echo "$task" | jq -r '.hour')
-            weekday=$(echo "$task" | jq -r '.weekday')  # null 或 1-7
+          if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
-            # 比较时间
-            if [ "$minute" = "$now_minute" ] && [ "$hour" = "$now_hour" ]; then
-              if [ "$weekday" = "null" ] || [ "$weekday" = "$now_weekday" ]; then
-                echo "==> Executing task: $id | $remark | $url"
-                curl -L --max-time 20 "$url" || echo "Request failed for $url"
-              else
-                echo "Skip $id (weekday not match)"
-              fi
-            else
-              echo "Skip $id (time not match)"
-            fi
-          done
+          tasks.forEach(task => {
+            if (!task.enabled) return;
+
+            if (shouldRun(task.cron)) {
+              console.log(`==> 执行任务 ${task.id}: ${task.url}`);
+
+              const { execSync } = require('child_process');
+              try {
+                const output = execSync(`curl -L --max-time 20 "${task.url}"`, { encoding: 'utf8' });
+                fs.appendFileSync(`logs/${task.id}.log`,
+                  `[${now.toISOString()}] SUCCESS\n${output}\n\n`
+                );
+              } catch (err) {
+                fs.appendFileSync(`logs/${task.id}.log`,
+                  `[${now.toISOString()}] FAILED\n${err}\n\n`
+                );
+              }
+            }
+          });
+          EOF
+
+      - name: Commit logs
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add logs/*.log || true
+          git commit -m "Update logs" || true
+          git push || true
+
+  cleanup:
+    runs-on: ubuntu-latest
+    schedule:
+      - cron: "0 0 * * *"   # 每天 UTC 0 点清理一次
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Cleanup old logs
+        run: |
+          find logs -type f -mtime +30 -delete || true
+
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add logs || true
+          git commit -m "Cleanup old logs" || true
+          git push || true
