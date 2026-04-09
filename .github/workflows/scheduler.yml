@@ -2,7 +2,7 @@ name: URL Scheduler (cron + logs)
 
 on:
   schedule:
-    - cron: "*/1 * * * *"   # 每分钟检查一次
+    - cron: "*/1 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write   # 关键：允许写入日志
+      contents: write
 
     steps:
       - name: Checkout
@@ -21,8 +21,8 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install cron-parser
-        run: npm install cron-parser
+      - name: Install cron-parser (compatible version)
+        run: npm install cron-parser@2.18.0
 
       - name: Run scheduler
         run: |
@@ -74,26 +74,4 @@ jobs:
           git config user.email "github-actions@github.com"
           git add logs/*.log || true
           git commit -m "Update logs" || true
-          git push || true
-
-  cleanup:
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Cleanup old logs
-        run: |
-          find logs -type f -mtime +30 -delete || true
-
-      - name: Commit cleanup
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add logs || true
-          git commit -m "Cleanup old logs" || true
           git push || true
