@@ -4,7 +4,7 @@ const REPO = "Reminder";          // 仓库名
 const BRANCH = "main";                  // 分支名（一般是 main 或 master）
 
 // 登录密码的 SHA-256（十六进制字符串）
-const PASSWORD_HASH = "REPLACE_WITH_YOUR_SHA256";
+const PASSWORD_HASH = "40c8d3372b595185f8526bd01936e2a796ae01e7f43039e7cb7a428920f34b62";
 
 // ======= GitHub API 路径 =======
 const API_TASKS_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/tasks.json`;
