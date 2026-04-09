@@ -1,4 +1,4 @@
-name: URL Scheduler (cron + logs)
+name: Heartbeat Test (cron)
 
 on:
   schedule:
@@ -10,75 +10,24 @@ env:
   LC_ALL: en_US.UTF-8
 
 jobs:
-  run:
+  heartbeat:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write   # 允许写入日志文件
+      contents: write   # 允许写入文件
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Install cron-parser (compatible version)
-        run: npm install cron-parser@2.18.0
-
-      - name: Run scheduler
+      - name: Write heartbeat
         run: |
-          node << 'EOF'
-          const fs = require('fs');
-          const parser = require('cron-parser');
+          echo "Heartbeat at $(date -u +"%Y-%m-%dT%H:%M:%SZ")" > heartbeat.txt
 
-          const tasks = JSON.parse(fs.readFileSync('tasks.json', 'utf8'));
-          const now = new Date();
-
-          // ---- 修复版 shouldRun：保证 */1 * * * * 每分钟执行 ----
-          function shouldRun(cronExpr) {
-            const expr = cronExpr.trim();
-
-            // 每分钟执行
-            if (expr === "*/1 * * * *" || expr === "* * * * *") {
-              return true;
-            }
-
-            // 未来扩展：其他 cron 表达式可在此添加
-            return false;
-          }
-
-          // ---- 日志目录 ----
-          if (!fs.existsSync('logs')) fs.mkdirSync('logs');
-
-          // ---- 执行任务 ----
-          tasks.forEach(task => {
-            if (!task.enabled) return;
-
-            if (shouldRun(task.cron)) {
-              console.log(`==> 执行任务 ${task.id}: ${task.url}`);
-
-              const { execSync } = require('child_process');
-              try {
-                const output = execSync(`curl -L --max-time 20 "${task.url}"`, { encoding: 'utf8' });
-                fs.appendFileSync(`logs/${task.id}.log`,
-                  `[${now.toISOString()}] SUCCESS\n${output}\n\n`
-                );
-              } catch (err) {
-                fs.appendFileSync(`logs/${task.id}.log`,
-                  `[${now.toISOString()}] FAILED\n${err}\n\n`
-                );
-              }
-            }
-          });
-          EOF
-
-      - name: Commit logs
+      - name: Commit heartbeat
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add logs/*.log || true
-          git commit -m "Update logs" || true
+          git add heartbeat.txt
+          git commit -m "Update heartbeat" || true
           git push || true
