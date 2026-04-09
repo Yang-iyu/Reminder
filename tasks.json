@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": "task-1775767149374",
+    "url": "http://miaotixing.com/trigger?id=trjbDuD",
+    "cron": "* * * * *",
+    "remark": "提醒：记录打卡数据",
+    "enabled": true
+  }
+]
