@@ -9,6 +9,9 @@ jobs:
   run:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write   # 关键：允许写入日志
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -35,7 +38,7 @@ jobs:
               const interval = parser.parseExpression(cronExpr, { currentDate: now });
               const prev = interval.prev();
               const diff = now - prev;
-              return diff >= 0 && diff < 60000; // 1 分钟内
+              return diff >= 0 && diff < 60000;
             } catch (e) {
               console.log("Cron 解析失败:", cronExpr, e.message);
               return false;
@@ -75,8 +78,9 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
-    schedule:
-      - cron: "0 0 * * *"   # 每天 UTC 0 点清理一次
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
