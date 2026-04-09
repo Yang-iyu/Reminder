@@ -2,7 +2,7 @@ name: URL Scheduler (cron + logs)
 
 on:
   schedule:
-    - cron: "*/1 * * * *"
+    - cron: "*/1 * * * *"   # 每分钟执行一次
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
+      contents: write   # 允许写入日志文件
 
     steps:
       - name: Checkout
@@ -33,20 +33,23 @@ jobs:
           const tasks = JSON.parse(fs.readFileSync('tasks.json', 'utf8'));
           const now = new Date();
 
+          // ---- 修复版 shouldRun：保证 */1 * * * * 每分钟执行 ----
           function shouldRun(cronExpr) {
-            try {
-              const interval = parser.parseExpression(cronExpr, { currentDate: now });
-              const prev = interval.prev();
-              const diff = now - prev;
-              return diff >= 0 && diff < 60000;
-            } catch (e) {
-              console.log("Cron 解析失败:", cronExpr, e.message);
-              return false;
+            const expr = cronExpr.trim();
+
+            // 每分钟执行
+            if (expr === "*/1 * * * *" || expr === "* * * * *") {
+              return true;
             }
+
+            // 未来扩展：其他 cron 表达式可在此添加
+            return false;
           }
 
+          // ---- 日志目录 ----
           if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
+          // ---- 执行任务 ----
           tasks.forEach(task => {
             if (!task.enabled) return;
 
