@@ -35,9 +35,7 @@ const saveTaskButton = document.getElementById("save-task-button");
 const cancelEditButton = document.getElementById("cancel-edit-button");
 const saveStatus = document.getElementById("save-status");
 
-const logModal = document.getElementById("log-modal");
 const logContent = document.getElementById("log-content");
-const closeLogButton = document.getElementById("close-log-button");
 
 // 工具：SHA-256
 async function sha256Hex(str) {
@@ -237,7 +235,7 @@ async function deleteTask(id) {
   await saveTasksToGithub(newTasks);
 }
 
-// 查看日志
+// 查看日志（右侧显示）
 async function viewLog(taskId) {
   logContent.textContent = "加载中...";
 
@@ -259,12 +257,6 @@ async function viewLog(taskId) {
   } catch (e) {
     logContent.textContent = "加载失败：" + e;
   }
-
-  logModal.classList.remove("hidden");
 }
-
-closeLogButton.addEventListener("click", () => {
-  logModal.classList.add("hidden");
-});
 
 reloadButton.addEventListener("click", loadTasks);
