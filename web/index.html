@@ -11,80 +11,86 @@
     <!-- 登录界面 -->
     <div id="login-panel" class="card">
       <h2>登录</h2>
+
       <div class="form-group">
         <label>登录密码：</label>
         <input type="password" id="password-input" />
       </div>
+
       <div class="form-group">
-        <label>GitHub Token（仅本地使用，不会保存）：</label>
+        <label>GitHub Token（仅本地使用，不保存）：</label>
         <input type="password" id="token-input" />
-        <small>需要对当前仓库的 <code>contents: write</code> 权限。</small>
       </div>
+
       <button id="login-button">登录</button>
       <p id="login-error" class="error"></p>
     </div>
 
-    <!-- 主界面 -->
-    <div id="main-panel" class="hidden">
+    <!-- 主界面：左右两栏布局 -->
+    <div id="main-panel" class="hidden two-columns">
 
-      <!-- 任务列表 -->
-      <div class="card">
-        <h2>任务列表</h2>
-        <button id="reload-button">重新加载任务</button>
+      <!-- 左侧：任务管理 -->
+      <div id="left-panel">
 
-        <table id="tasks-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>URL</th>
-              <th>Cron 表达式</th>
-              <th>备注</th>
-              <th>启用</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody id="tasks-tbody"></tbody>
-        </table>
+        <!-- 新建任务 -->
+        <div class="card">
+          <h2 id="form-title">新增任务</h2>
+
+          <div class="form-group">
+            <label>URL：</label>
+            <input type="text" id="task-url" placeholder="https://..." />
+          </div>
+
+          <div class="form-group">
+            <label>Cron：</label>
+            <input type="text" id="task-cron" placeholder="*/15 * * * *" />
+            <small>标准 5 字段 cron：分钟 小时 日 月 星期</small>
+          </div>
+
+          <div class="form-group">
+            <label>备注：</label>
+            <input type="text" id="task-remark" />
+          </div>
+
+          <div class="form-group">
+            <label>启用：</label>
+            <input type="checkbox" id="task-enabled" checked />
+          </div>
+
+          <input type="hidden" id="task-id" />
+
+          <button id="save-task-button">保存任务</button>
+          <button id="cancel-edit-button" class="secondary hidden">取消编辑</button>
+          <p id="save-status"></p>
+        </div>
+
+        <!-- 任务列表 -->
+        <div class="card">
+          <h2>任务列表</h2>
+          <button id="reload-button">重新加载任务</button>
+
+          <table id="tasks-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>URL</th>
+                <th>Cron</th>
+                <th>备注</th>
+                <th>启用</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="tasks-tbody"></tbody>
+          </table>
+        </div>
+
       </div>
 
-      <!-- 新增/编辑任务 -->
-      <div class="card">
-        <h2 id="form-title">新增任务</h2>
-
-        <div class="form-group">
-          <label>URL：</label>
-          <input type="text" id="task-url" placeholder="https://..." />
-        </div>
-
-        <div class="form-group">
-          <label>Cron 表达式：</label>
-          <input type="text" id="task-cron" placeholder="例如：*/15 * * * *" />
-          <small>支持标准 5 字段 cron：分钟 小时 日 月 星期</small>
-        </div>
-
-        <div class="form-group">
-          <label>备注：</label>
-          <input type="text" id="task-remark" />
-        </div>
-
-        <div class="form-group">
-          <label>启用：</label>
-          <input type="checkbox" id="task-enabled" checked />
-        </div>
-
-        <input type="hidden" id="task-id" />
-
-        <button id="save-task-button">保存任务</button>
-        <button id="cancel-edit-button" class="secondary hidden">取消编辑</button>
-        <p id="save-status"></p>
-      </div>
-
-      <!-- 日志查看弹窗 -->
-      <div id="log-modal" class="modal hidden">
-        <div class="modal-content">
-          <h3>任务日志</h3>
-          <pre id="log-content"></pre>
-          <button id="close-log-button">关闭</button>
+      <!-- 右侧：日志显示 -->
+      <div id="right-panel">
+        <div class="card">
+          <h2>任务日志</h2>
+          <pre id="log-content">请选择左侧任务查看日志</pre>
         </div>
       </div>
 
