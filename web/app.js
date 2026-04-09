@@ -4,20 +4,17 @@ const REPO = "Reminder";          // 仓库名
 const BRANCH = "main";                  // 分支名（一般是 main 或 master）
 
 // 登录密码的 SHA-256（十六进制字符串）
-// 你可以自己算好 SHA-256，然后填到这里
-// 例如：echo -n "your-password" | sha256sum
-const PASSWORD_HASH = "40c8d3372b595185f8526bd01936e2a796ae01e7f43039e7cb7a428920f34b62";
+const PASSWORD_HASH = "REPLACE_WITH_YOUR_SHA256";
 
-// ======= 下面的代码一般不需要改 =======
-
-const RAW_TASKS_URL = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/tasks.json`;
-const API_CONTENT_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/tasks.json`;
+// ======= GitHub API 路径 =======
+const API_TASKS_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/tasks.json`;
+const API_LOGS_DIR_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/logs`;
 
 let githubToken = null;
 let tasks = [];
-let currentFileSha = null; // 用于 GitHub API 更新文件
+let currentTasksSha = null;
 
-// DOM
+// DOM 元素
 const loginPanel = document.getElementById("login-panel");
 const mainPanel = document.getElementById("main-panel");
 const passwordInput = document.getElementById("password-input");
@@ -30,15 +27,17 @@ const tasksTbody = document.getElementById("tasks-tbody");
 
 const formTitle = document.getElementById("form-title");
 const taskUrlInput = document.getElementById("task-url");
-const taskHourInput = document.getElementById("task-hour");
-const taskMinuteInput = document.getElementById("task-minute");
-const taskWeekdaySelect = document.getElementById("task-weekday");
+const taskCronInput = document.getElementById("task-cron");
 const taskRemarkInput = document.getElementById("task-remark");
 const taskEnabledCheckbox = document.getElementById("task-enabled");
 const taskIdInput = document.getElementById("task-id");
 const saveTaskButton = document.getElementById("save-task-button");
 const cancelEditButton = document.getElementById("cancel-edit-button");
 const saveStatus = document.getElementById("save-status");
+
+const logModal = document.getElementById("log-modal");
+const logContent = document.getElementById("log-content");
+const closeLogButton = document.getElementById("close-log-button");
 
 // 工具：SHA-256
 async function sha256Hex(str) {
@@ -73,13 +72,13 @@ loginButton.addEventListener("click", async () => {
   loadTasks();
 });
 
-// 加载任务（从 raw.githubusercontent.com）
+// 加载任务
 async function loadTasks() {
   saveStatus.textContent = "";
-  tasksTbody.innerHTML = "<tr><td colspan='7'>加载中...</td></tr>";
+  tasksTbody.innerHTML = "<tr><td colspan='6'>加载中...</td></tr>";
 
   try {
-    const res = await fetch(API_CONTENT_URL, {
+    const res = await fetch(API_TASKS_URL, {
       headers: {
         Authorization: `Bearer ${githubToken}`,
         Accept: "application/vnd.github+json"
@@ -87,26 +86,25 @@ async function loadTasks() {
     });
 
     if (!res.ok) {
-      tasksTbody.innerHTML = `<tr><td colspan='7'>加载失败：${res.status}</td></tr>`;
+      tasksTbody.innerHTML = `<tr><td colspan='6'>加载失败：${res.status}</td></tr>`;
       return;
     }
 
     const data = await res.json();
-    currentFileSha = data.sha;
+    currentTasksSha = data.sha;
 
     const content = atob(data.content.replace(/\n/g, ""));
     tasks = JSON.parse(content);
 
     renderTasks();
   } catch (e) {
-    console.error(e);
-    tasksTbody.innerHTML = `<tr><td colspan='7'>加载失败：${e}</td></tr>`;
+    tasksTbody.innerHTML = `<tr><td colspan='6'>加载失败：${e}</td></tr>`;
   }
 }
 
 function renderTasks() {
   if (!Array.isArray(tasks) || tasks.length === 0) {
-    tasksTbody.innerHTML = "<tr><td colspan='7'>暂无任务</td></tr>";
+    tasksTbody.innerHTML = "<tr><td colspan='6'>暂无任务</td></tr>";
     return;
   }
 
@@ -114,69 +112,31 @@ function renderTasks() {
   tasks.forEach(task => {
     const tr = document.createElement("tr");
 
-    const tdId = document.createElement("td");
-    tdId.textContent = task.id;
+    tr.innerHTML = `
+      <td>${task.id}</td>
+      <td>${task.url}</td>
+      <td>${task.cron}</td>
+      <td>${task.remark || ""}</td>
+      <td>${task.enabled ? "是" : "否"}</td>
+      <td>
+        <button class="edit-btn">编辑</button>
+        <button class="log-btn">日志</button>
+        <button class="danger delete-btn">删除</button>
+      </td>
+    `;
 
-    const tdUrl = document.createElement("td");
-    tdUrl.textContent = task.url;
-
-    const tdTime = document.createElement("td");
-    tdTime.textContent = `${task.hour}:${task.minute}`;
-
-    const tdWeekday = document.createElement("td");
-    tdWeekday.textContent = weekdayToText(task.weekday);
-
-    const tdRemark = document.createElement("td");
-    tdRemark.textContent = task.remark || "";
-
-    const tdEnabled = document.createElement("td");
-    tdEnabled.textContent = task.enabled ? "是" : "否";
-
-    const tdActions = document.createElement("td");
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "编辑";
-    editBtn.addEventListener("click", () => editTask(task.id));
-
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "删除";
-    delBtn.classList.add("danger");
-    delBtn.addEventListener("click", () => deleteTask(task.id));
-
-    tdActions.appendChild(editBtn);
-    tdActions.appendChild(delBtn);
-
-    tr.appendChild(tdId);
-    tr.appendChild(tdUrl);
-    tr.appendChild(tdTime);
-    tr.appendChild(tdWeekday);
-    tr.appendChild(tdRemark);
-    tr.appendChild(tdEnabled);
-    tr.appendChild(tdActions);
+    tr.querySelector(".edit-btn").addEventListener("click", () => editTask(task.id));
+    tr.querySelector(".delete-btn").addEventListener("click", () => deleteTask(task.id));
+    tr.querySelector(".log-btn").addEventListener("click", () => viewLog(task.id));
 
     tasksTbody.appendChild(tr);
   });
 }
 
-function weekdayToText(w) {
-  if (w === null || w === undefined || w === "") return "每天";
-  const map = {
-    1: "周一",
-    2: "周二",
-    3: "周三",
-    4: "周四",
-    5: "周五",
-    6: "周六",
-    7: "周日"
-  };
-  return map[w] || String(w);
-}
-
 // 新增/编辑任务
 saveTaskButton.addEventListener("click", async () => {
   const url = taskUrlInput.value.trim();
-  const hour = taskHourInput.value.trim();
-  const minute = taskMinuteInput.value.trim();
-  const weekdayVal = taskWeekdaySelect.value;
+  const cron = taskCronInput.value.trim();
   const remark = taskRemarkInput.value.trim();
   const enabled = taskEnabledCheckbox.checked;
   const id = taskIdInput.value.trim();
@@ -185,48 +145,21 @@ saveTaskButton.addEventListener("click", async () => {
     saveStatus.textContent = "URL 不能为空。";
     return;
   }
-  if (hour === "" || minute === "") {
-    saveStatus.textContent = "时间不能为空。";
+  if (!cron) {
+    saveStatus.textContent = "Cron 表达式不能为空。";
     return;
   }
-
-  const h = parseInt(hour, 10);
-  const m = parseInt(minute, 10);
-  if (isNaN(h) || h < 0 || h > 23 || isNaN(m) || m < 0 || m > 59) {
-    saveStatus.textContent = "时间格式不正确。";
-    return;
-  }
-
-  const weekday = weekdayVal === "" ? null : parseInt(weekdayVal, 10);
 
   let newTasks = Array.isArray(tasks) ? [...tasks] : [];
 
   if (id) {
-    // 编辑
     const idx = newTasks.findIndex(t => t.id === id);
     if (idx !== -1) {
-      newTasks[idx] = {
-        ...newTasks[idx],
-        url,
-        hour: h.toString().padStart(2, "0"),
-        minute: m.toString().padStart(2, "0"),
-        weekday,
-        remark,
-        enabled
-      };
+      newTasks[idx] = { ...newTasks[idx], url, cron, remark, enabled };
     }
   } else {
-    // 新增
     const newId = "task-" + Date.now();
-    newTasks.push({
-      id: newId,
-      url,
-      hour: h.toString().padStart(2, "0"),
-      minute: m.toString().padStart(2, "0"),
-      weekday,
-      remark,
-      enabled
-    });
+    newTasks.push({ id: newId, url, cron, remark, enabled });
   }
 
   await saveTasksToGithub(newTasks);
@@ -242,14 +175,11 @@ async function saveTasksToGithub(newTasks) {
     const body = {
       message: "Update tasks.json",
       content: base64Content,
-      branch: BRANCH
+      branch: BRANCH,
+      sha: currentTasksSha
     };
 
-    if (currentFileSha) {
-      body.sha = currentFileSha;
-    }
-
-    const res = await fetch(API_CONTENT_URL, {
+    const res = await fetch(API_TASKS_URL, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${githubToken}`,
@@ -265,13 +195,12 @@ async function saveTasksToGithub(newTasks) {
     }
 
     const data = await res.json();
-    currentFileSha = data.content.sha;
+    currentTasksSha = data.content.sha;
     tasks = newTasks;
     renderTasks();
     clearForm();
     saveStatus.textContent = "保存成功。";
   } catch (e) {
-    console.error(e);
     saveStatus.textContent = `保存失败：${e}`;
   }
 }
@@ -280,9 +209,7 @@ function clearForm() {
   formTitle.textContent = "新增任务";
   taskIdInput.value = "";
   taskUrlInput.value = "";
-  taskHourInput.value = "";
-  taskMinuteInput.value = "";
-  taskWeekdaySelect.value = "";
+  taskCronInput.value = "";
   taskRemarkInput.value = "";
   taskEnabledCheckbox.checked = true;
   cancelEditButton.classList.add("hidden");
@@ -295,24 +222,49 @@ function editTask(id) {
   formTitle.textContent = "编辑任务";
   taskIdInput.value = task.id;
   taskUrlInput.value = task.url;
-  taskHourInput.value = parseInt(task.hour, 10);
-  taskMinuteInput.value = parseInt(task.minute, 10);
-  taskWeekdaySelect.value = task.weekday == null ? "" : String(task.weekday);
+  taskCronInput.value = task.cron;
   taskRemarkInput.value = task.remark || "";
   taskEnabledCheckbox.checked = !!task.enabled;
   cancelEditButton.classList.remove("hidden");
 }
 
-cancelEditButton.addEventListener("click", () => {
-  clearForm();
-});
+cancelEditButton.addEventListener("click", () => clearForm());
 
+// 删除任务
 async function deleteTask(id) {
   if (!confirm("确定要删除这个任务吗？")) return;
   const newTasks = tasks.filter(t => t.id !== id);
   await saveTasksToGithub(newTasks);
 }
 
-reloadButton.addEventListener("click", () => {
-  loadTasks();
+// 查看日志
+async function viewLog(taskId) {
+  logContent.textContent = "加载中...";
+
+  try {
+    const res = await fetch(`${API_LOGS_DIR_URL}/${taskId}.log`, {
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: "application/vnd.github+json"
+      }
+    });
+
+    if (!res.ok) {
+      logContent.textContent = "暂无日志或加载失败。";
+    } else {
+      const data = await res.json();
+      const content = atob(data.content.replace(/\n/g, ""));
+      logContent.textContent = content;
+    }
+  } catch (e) {
+    logContent.textContent = "加载失败：" + e;
+  }
+
+  logModal.classList.remove("hidden");
+}
+
+closeLogButton.addEventListener("click", () => {
+  logModal.classList.add("hidden");
 });
+
+reloadButton.addEventListener("click", loadTasks);
